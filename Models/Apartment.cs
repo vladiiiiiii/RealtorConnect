@@ -1,43 +1,34 @@
-﻿
-using RealtorConnect.Models;
-using System.Collections.Generic;
+﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 using System.ComponentModel.DataAnnotations.Schema;
 
-
-public class Apartment
+namespace RealtorConnect.Models
 {
-    [Key]
-    public int Id { get; set; } // Уникальный идентификатор квартиры
+    public class Apartment
+    {
+        [Key]
+        public int Id { get; set; }
 
-    [Required]
-    public string Address { get; set; } = null!; // Уникальный адрес квартиры
-    public decimal Price { get; set; } // Цена квартиры
-    public int Rooms { get; set; } // Количество комнат
-    public int Floor { get; set; }
-    public string? PhotoUrl { get; set; }
-    public string? HouseView { get; set; }
-    public double Area { get; set; } // Площадь квартиры
-    public string Description { get; set; } = null!; // Описание квартиры
-   
-    
-    public int StatusId { get; set; }
+        [Required]
+        public string Address { get; set; } = null!;
+        public decimal Price { get; set; }
+        public int Rooms { get; set; }
+        public int Floor { get; set; }
+        public string? PhotoUrl { get; set; }
+        public string? HouseView { get; set; }
+        public string Area { get; set; }
+        public string Description { get; set; } = null!;
+        public decimal SquareArea { get; set; } // Площадь в квадратных метрах
 
-    // Риэлтор, управляющий квартирой
-    public int RealtorId { get; set; }
+        public ApartmentStatus Status { get; set; } = null!;
 
-    [ForeignKey(nameof(RealtorId))]
-    public Realtor Realtor { get; set; } = null!;
+        public int? RealtorId { get; set; } // Для квартир риэлтора
+        public int? ClientId { get; set; }  // Для квартир клиента
 
-    // Группа риэлторов
-    public int RealtorGroupId { get; set; }
-
-    [ForeignKey(nameof(RealtorGroupId))]
-    public RealtorGroup RealtorGroup { get; set; } = null!;
-
-    // Связь с избранным
-    public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
-
-
+        public virtual ApartmentStatus ApartmentStatus { get; set; }
+        public virtual Realtor Realtor { get; set; }
+        public virtual Client Client { get; set; }
+        public virtual ICollection<Favorite> Favorites { get; set; }
+        public virtual ICollection<ViewHistory> ViewHistories { get; set; }
+    }
 }
-

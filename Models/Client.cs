@@ -1,20 +1,29 @@
-﻿using RealtorConnect.Models;
+﻿using System.Collections.Generic;
 using System.ComponentModel.DataAnnotations;
 
-public class Client
+namespace RealtorConnect.Models
 {
-    public int Id { get; set; } // Уникальный идентификатор клиента
-    public string Name { get; set; } = null!; // Имя клиента
+    public class Client
+    {
+        public int Id { get; set; }
 
-    [Required, EmailAddress, MaxLength(100)]
-    public string Email { get; set; } = null!; // Уникальный email
+        [Required, MaxLength(100)]
+        public string Name { get; set; }
 
-    public string PasswordHash { get; set; } = null;
+        [Required, EmailAddress, MaxLength(100)]
+        public string Email { get; set; }
 
-    public ICollection<GroupClient> GroupClients { get; set; } = new List<GroupClient>();
+        [Required]
+        public string PasswordHash { get; set; }
 
-    // Связь с избранным
-    public ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
+        public int? GroupClientId { get; set; }
+        public virtual GroupClient GroupClient { get; set; }
+
+        // Навигационные свойства с инициализацией
+        public virtual ICollection<ChatMessage>? SentMessages { get; set; } = new List<ChatMessage>();
+        public virtual ICollection<ChatMessage>? ReceivedMessages { get; set; } = new List<ChatMessage>();
+        public virtual ICollection<Favorite> Favorites { get; set; } = new List<Favorite>();
+        public virtual ICollection<Apartment> Apartments { get; set; } = new List<Apartment>();
+        public virtual ICollection<ViewHistory> ViewHistories { get; set; } = new List<ViewHistory>();
+    }
 }
-
-

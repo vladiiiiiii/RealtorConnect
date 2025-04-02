@@ -11,13 +11,9 @@ namespace RealtorConnect.Models
         [Required]
         public string Name { get; set; } = null!;
 
-        // Связь с риэлторами
-        public ICollection<Realtor> Realtors { get; set; } = new List<Realtor>();
+        public virtual ICollection<GroupRealtor> GroupRealtors { get; set; }
+        public virtual ICollection<GroupClient> GroupClients { get; set; }
+        public virtual ICollection<Apartment> Apartments { get; set; }
 
-        // Связь с клиентами
-        public ICollection<GroupClient> GroupClients { get; set; } = new List<GroupClient>();
-
-        // Квартиры, доступные группе
-        public ICollection<Apartment> Apartments { get; set; } = new List<Apartment>();
     }
 }

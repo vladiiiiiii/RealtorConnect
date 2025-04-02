@@ -1,6 +1,24 @@
 @RealtorConnect_HostAddress = http://localhost:5130
 
-GET {{RealtorConnect_HostAddress}}/weatherforecast/
+### Получение списка квартир
+GET {{RealtorConnect_HostAddress}}/api/apartments
 Accept: application/json
 
-###
+### Отправка сообщения в чат
+POST {{RealtorConnect_HostAddress}}/api/chat
+Content-Type: application/json
+Accept: application/json
+
+{
+  "clientId": 1,
+  "realTorId": 1,
+  "message": "Привет, интересует квартира!"
+}
+
+### Получение списка клиентов
+GET {{RealtorConnect_HostAddress}}/api/clients
+Accept: application/json
+
+### Получение списка риэлторов
+GET {{RealtorConnect_HostAddress}}/api/realtors
+Accept: application/json
