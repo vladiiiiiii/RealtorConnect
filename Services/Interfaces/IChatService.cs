@@ -1,10 +1,10 @@
 ﻿using RealtorConnect.Models;
 
-namespace RealtorConnect.Repositories.Interfaces
+namespace RealtorConnect.Services.Interfaces
 {
-    public interface IChatRepository
+    public interface IChatService
     {
         Task<List<ChatMessage>> GetChatMessagesAsync(int senderId, string senderType, int receiverId, string receiverType);
-        Task AddMessageAsync(ChatMessage message);
+        Task SendMessageAsync(ChatMessage message, int clientId);
     }
 }

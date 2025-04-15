@@ -2,9 +2,9 @@
 using System;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
-using Microsoft.EntityFrameworkCore.Metadata;
 using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
+using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 using RealtorConnect.Data;
 
 #nullable disable
@@ -12,7 +12,7 @@ using RealtorConnect.Data;
 namespace RealtorConnect.Migrations
 {
     [DbContext(typeof(ApplicationDbContext))]
-    [Migration("20250401190804_InitialCreate")]
+    [Migration("20250414180619_InitialCreate")]
     partial class InitialCreate
     {
         /// <inheritdoc />
@@ -21,70 +21,70 @@ namespace RealtorConnect.Migrations
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "8.0.10")
-                .HasAnnotation("Relational:MaxIdentifierLength", 128);
+                .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
-            SqlServerModelBuilderExtensions.UseIdentityColumns(modelBuilder);
+            NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
+
+            modelBuilder.Entity("RealtorConnect.Models.Admin", b =>
+                {
+                    b.Property<int>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("integer");
+
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<string>("Email")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Password")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("Admins");
+                });
 
             modelBuilder.Entity("RealtorConnect.Models.Apartment", b =>
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Address")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
-                    b.Property<int>("ApartmentStatusId")
-                        .HasColumnType("int");
-
-                    b.Property<string>("Area")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                    b.Property<double>("Area")
+                        .HasColumnType("double precision");
 
                     b.Property<int?>("ClientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<string>("Description")
-                        .IsRequired()
-                        .HasColumnType("nvarchar(max)");
-
-                    b.Property<int>("Floor")
-                        .HasColumnType("int");
-
-                    b.Property<string>("HouseView")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<string>("PhotoUrl")
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.Property<decimal>("Price")
-                        .HasColumnType("decimal(18,2)");
-
-                    b.Property<int?>("RealtorGroupId")
-                        .HasColumnType("int");
+                        .HasColumnType("numeric");
 
                     b.Property<int?>("RealtorId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("Rooms")
-                        .HasColumnType("int");
-
-                    b.Property<decimal>("SquareArea")
-                        .HasColumnType("decimal(18,2)");
+                        .HasColumnType("integer");
 
                     b.Property<int>("StatusId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
-                    b.HasIndex("ApartmentStatusId");
-
                     b.HasIndex("ClientId");
-
-                    b.HasIndex("RealtorGroupId");
 
                     b.HasIndex("RealtorId");
 
@@ -97,13 +97,13 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -126,38 +126,32 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
-                    b.Property<string>("MessageContent")
+                    b.Property<string>("Content")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
-                    b.Property<int?>("ReceiverClientId")
-                        .HasColumnType("int");
+                    b.Property<int>("ReceiverId")
+                        .HasColumnType("integer");
 
-                    b.Property<int?>("ReceiverRealtorId")
-                        .HasColumnType("int");
+                    b.Property<string>("ReceiverType")
+                        .IsRequired()
+                        .HasColumnType("text");
 
-                    b.Property<int?>("SenderClientId")
-                        .HasColumnType("int");
+                    b.Property<int>("SenderId")
+                        .HasColumnType("integer");
 
-                    b.Property<int?>("SenderRealtorId")
-                        .HasColumnType("int");
+                    b.Property<string>("SenderType")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<DateTime>("SentAt")
-                        .HasColumnType("datetime2");
+                        .HasColumnType("timestamp with time zone");
 
                     b.HasKey("Id");
-
-                    b.HasIndex("ReceiverClientId");
-
-                    b.HasIndex("ReceiverRealtorId");
-
-                    b.HasIndex("SenderClientId");
-
-                    b.HasIndex("SenderRealtorId");
 
                     b.ToTable("ChatMessages");
                 });
@@ -166,32 +160,43 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
+
+                    b.Property<int?>("CreatedByRealtorId")
+                        .HasColumnType("integer");
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("text");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int?>("GroupClientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("LastName")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("text");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Password")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhotoUrl")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("GroupClientId")
-                        .IsUnique()
-                        .HasFilter("[GroupClientId] IS NOT NULL");
+                        .IsUnique();
 
                     b.ToTable("Clients");
                 });
@@ -199,13 +204,10 @@ namespace RealtorConnect.Migrations
             modelBuilder.Entity("RealtorConnect.Models.Favorite", b =>
                 {
                     b.Property<int>("ClientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("ApartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Id")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("ClientId", "ApartmentId");
 
@@ -218,15 +220,15 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("ClientId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("GroupId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
@@ -239,21 +241,19 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<int>("GroupId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.Property<int>("RealtorId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
                     b.HasKey("Id");
 
                     b.HasIndex("GroupId");
-
-                    b.HasIndex("RealtorId");
 
                     b.ToTable("GroupRealtors");
                 });
@@ -262,36 +262,40 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Email")
                         .IsRequired()
-                        .HasMaxLength(100)
-                        .HasColumnType("nvarchar(100)");
+                        .HasColumnType("text");
+
+                    b.Property<string>("FirstName")
+                        .IsRequired()
+                        .HasColumnType("text");
 
                     b.Property<int?>("GroupRealtorId")
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    b.Property<string>("Name")
+                    b.Property<string>("LastName")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
-                    b.Property<string>("PasswordHash")
+                    b.Property<string>("Password")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
-                    b.Property<int>("RealtorGroupId")
-                        .HasColumnType("int");
+                    b.Property<string>("Phone")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("PhotoUrl")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
                     b.HasIndex("GroupRealtorId")
-                        .IsUnique()
-                        .HasFilter("[GroupRealtorId] IS NOT NULL");
-
-                    b.HasIndex("RealtorGroupId");
+                        .IsUnique();
 
                     b.ToTable("Realtors");
                 });
@@ -300,13 +304,13 @@ namespace RealtorConnect.Migrations
                 {
                     b.Property<int>("Id")
                         .ValueGeneratedOnAdd()
-                        .HasColumnType("int");
+                        .HasColumnType("integer");
 
-                    SqlServerPropertyBuilderExtensions.UseIdentityColumn(b.Property<int>("Id"));
+                    NpgsqlPropertyBuilderExtensions.UseIdentityByDefaultColumn(b.Property<int>("Id"));
 
                     b.Property<string>("Name")
                         .IsRequired()
-                        .HasColumnType("nvarchar(max)");
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -320,43 +324,12 @@ namespace RealtorConnect.Migrations
                         });
                 });
 
-            modelBuilder.Entity("RealtorConnect.Models.ViewHistory", b =>
-                {
-                    b.Property<int>("ClientId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("ApartmentId")
-                        .HasColumnType("int");
-
-                    b.Property<int>("Id")
-                        .HasColumnType("int");
-
-                    b.Property<DateTime>("ViewedAt")
-                        .HasColumnType("datetime2");
-
-                    b.HasKey("ClientId", "ApartmentId");
-
-                    b.HasIndex("ApartmentId");
-
-                    b.ToTable("ViewHistories");
-                });
-
             modelBuilder.Entity("RealtorConnect.Models.Apartment", b =>
                 {
-                    b.HasOne("RealtorConnect.Models.ApartmentStatus", "ApartmentStatus")
-                        .WithMany()
-                        .HasForeignKey("ApartmentStatusId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.HasOne("RealtorConnect.Models.Client", "Client")
                         .WithMany("Apartments")
                         .HasForeignKey("ClientId")
                         .OnDelete(DeleteBehavior.SetNull);
-
-                    b.HasOne("RealtorConnect.Models.RealtorGroup", null)
-                        .WithMany("Apartments")
-                        .HasForeignKey("RealtorGroupId");
 
                     b.HasOne("RealtorConnect.Models.Realtor", "Realtor")
                         .WithMany("Apartments")
@@ -369,44 +342,11 @@ namespace RealtorConnect.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.Navigation("ApartmentStatus");
-
                     b.Navigation("Client");
 
                     b.Navigation("Realtor");
 
                     b.Navigation("Status");
-                });
-
-            modelBuilder.Entity("RealtorConnect.Models.ChatMessage", b =>
-                {
-                    b.HasOne("RealtorConnect.Models.Client", "ReceiverClient")
-                        .WithMany("ReceivedMessages")
-                        .HasForeignKey("ReceiverClientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("RealtorConnect.Models.Realtor", "ReceiverRealtor")
-                        .WithMany("ReceivedMessages")
-                        .HasForeignKey("ReceiverRealtorId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("RealtorConnect.Models.Client", "SenderClient")
-                        .WithMany("SentMessages")
-                        .HasForeignKey("SenderClientId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.HasOne("RealtorConnect.Models.Realtor", "SenderRealtor")
-                        .WithMany("SentMessages")
-                        .HasForeignKey("SenderRealtorId")
-                        .OnDelete(DeleteBehavior.Restrict);
-
-                    b.Navigation("ReceiverClient");
-
-                    b.Navigation("ReceiverRealtor");
-
-                    b.Navigation("SenderClient");
-
-                    b.Navigation("SenderRealtor");
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.Client", b =>
@@ -457,12 +397,6 @@ namespace RealtorConnect.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("RealtorConnect.Models.Realtor", null)
-                        .WithMany("GroupRealtors")
-                        .HasForeignKey("RealtorId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("RealtorGroup");
                 });
 
@@ -473,41 +407,12 @@ namespace RealtorConnect.Migrations
                         .HasForeignKey("RealtorConnect.Models.Realtor", "GroupRealtorId")
                         .OnDelete(DeleteBehavior.Cascade);
 
-                    b.HasOne("RealtorConnect.Models.RealtorGroup", "RealtorGroup")
-                        .WithMany()
-                        .HasForeignKey("RealtorGroupId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
                     b.Navigation("GroupRealtor");
-
-                    b.Navigation("RealtorGroup");
-                });
-
-            modelBuilder.Entity("RealtorConnect.Models.ViewHistory", b =>
-                {
-                    b.HasOne("RealtorConnect.Models.Apartment", "Apartment")
-                        .WithMany("ViewHistories")
-                        .HasForeignKey("ApartmentId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.HasOne("RealtorConnect.Models.Client", "Client")
-                        .WithMany("ViewHistories")
-                        .HasForeignKey("ClientId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
-
-                    b.Navigation("Apartment");
-
-                    b.Navigation("Client");
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.Apartment", b =>
                 {
                     b.Navigation("Favorites");
-
-                    b.Navigation("ViewHistories");
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.Client", b =>
@@ -515,39 +420,27 @@ namespace RealtorConnect.Migrations
                     b.Navigation("Apartments");
 
                     b.Navigation("Favorites");
-
-                    b.Navigation("ReceivedMessages");
-
-                    b.Navigation("SentMessages");
-
-                    b.Navigation("ViewHistories");
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.GroupClient", b =>
                 {
-                    b.Navigation("Client");
+                    b.Navigation("Client")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.GroupRealtor", b =>
                 {
-                    b.Navigation("Realtor");
+                    b.Navigation("Realtor")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.Realtor", b =>
                 {
                     b.Navigation("Apartments");
-
-                    b.Navigation("GroupRealtors");
-
-                    b.Navigation("ReceivedMessages");
-
-                    b.Navigation("SentMessages");
                 });
 
             modelBuilder.Entity("RealtorConnect.Models.RealtorGroup", b =>
                 {
-                    b.Navigation("Apartments");
-
                     b.Navigation("GroupClients");
 
                     b.Navigation("GroupRealtors");

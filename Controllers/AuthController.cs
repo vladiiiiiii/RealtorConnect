@@ -1,12 +1,7 @@
 ﻿using Microsoft.AspNetCore.Mvc;
-using Microsoft.EntityFrameworkCore; // Добавляем пространство имён
-using Microsoft.IdentityModel.Tokens;
-using System.IdentityModel.Tokens.Jwt;
-using System.Security.Claims;
-using System.Text;
-using RealtorConnect.Data;
+using Microsoft.EntityFrameworkCore;
 using RealtorConnect.Models;
-using static BCrypt.Net.BCrypt;
+using RealtorConnect.Services.Interfaces;
 
 namespace RealtorConnect.Controllers
 {
@@ -14,118 +9,45 @@ namespace RealtorConnect.Controllers
     [ApiController]
     public class AuthController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
-        private readonly IConfiguration _configuration;
+        private readonly IAuthService _authService;
 
-        public AuthController(ApplicationDbContext context, IConfiguration configuration)
+        public AuthController(IAuthService authService)
         {
-            _context = context;
-            _configuration = configuration;
+            _authService = authService;
         }
 
-        // ...
-
-        [HttpPost("register")]
-        public async Task<IActionResult> Register([FromBody] RegisterRequest model)
+        [HttpPost("register-realtor")]
+        public async Task<IActionResult> RegisterRealtor([FromBody] Realtor realtor)
         {
-            if (await _context.Clients.AnyAsync(c => c.Email == model.Email) ||
-                await _context.Realtors.AnyAsync(r => r.Email == model.Email))
-            {
-                return BadRequest("Email already exists.");
-            }
+            var success = await _authService.RegisterRealtorAsync(realtor);
+            if (!success)
+                return BadRequest("Email already exists");
 
-            if (model.UserType == "Client")
-            {
-                var client = new Client
-                {
-                    Name = model.Name,
-                    Email = model.Email,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password), 
-                };
-                _context.Clients.Add(client);
-                await _context.SaveChangesAsync();
-            }
-            else if (model.UserType == "Realtor")
-            {
-                var realtor = new Realtor
-                {
-                    Name = model.Name,
-                    Email = model.Email,
-                    PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password), 
-                };
-                _context.Realtors.Add(realtor);
-                await _context.SaveChangesAsync();
+            return Ok(new { Message = "Realtor registered successfully" });
+        }
 
-                var groupRealtor = new GroupRealtor
-                {
-                    GroupId = 1,
-                    RealtorId = realtor.Id
-                };
-                _context.GroupRealtors.Add(groupRealtor);
-                await _context.SaveChangesAsync();
+        [HttpPost("register-client")]
+        public async Task<IActionResult> RegisterClient([FromBody] Client client)
+        {
+            var success = await _authService.RegisterClientAsync(client);
+            if (!success)
+                return BadRequest("Email already exists");
 
-                realtor.GroupRealtorId = groupRealtor.Id;
-                await _context.SaveChangesAsync();
-            }
-            else
-            {
-                return BadRequest("Invalid user type.");
-            }
-
-            return Ok(new { Message = "User registered successfully" });
+            return Ok(new { Message = "Client registered successfully" });
         }
 
         [HttpPost("login")]
-        public IActionResult Login([FromBody] LoginRequest model)
+        public async Task<IActionResult> Login([FromBody] LoginModel model)
         {
-            Client client = _context.Clients.FirstOrDefault(c => c.Email == model.Email);
-            if (client != null && BCrypt.Net.BCrypt.Verify(model.Password, client.PasswordHash))
-            {
-                var token = GenerateJwtToken(client);
-                return Ok(new { Token = token, UserType = "Client" });
-            }
+            var result = await _authService.LoginAsync(model.Email, model.Password);
+            if (result == null)
+                return Unauthorized("Invalid credentials");
 
-            Realtor realtor = _context.Realtors.FirstOrDefault(r => r.Email == model.Email);
-            if (realtor != null && BCrypt.Net.BCrypt.Verify(model.Password, realtor.PasswordHash))
-            {
-                var token = GenerateJwtToken(realtor);
-                return Ok(new { Token = token, UserType = "Realtor" });
-            }
-
-            return Unauthorized("Invalid credentials.");
-        }
-
-        private string GenerateJwtToken(object user)
-        {
-            var claims = new[]
-            {
-                new Claim(ClaimTypes.NameIdentifier, user.GetType().Name == "Client" ? ((Client)user).Id.ToString() : ((Realtor)user).Id.ToString()),
-                new Claim(ClaimTypes.Role, user.GetType().Name == "Client" ? "Client" : "Realtor")
-            };
-
-            var key = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(_configuration["Jwt:Key"]));
-            var creds = new SigningCredentials(key, SecurityAlgorithms.HmacSha256);
-
-            var token = new JwtSecurityToken(
-                issuer: _configuration["Jwt:Issuer"],
-                audience: _configuration["Jwt:Audience"],
-                claims: claims,
-                expires: DateTime.Now.AddHours(3),
-                signingCredentials: creds);
-
-            return new JwtSecurityTokenHandler().WriteToken(token);
+            return Ok(new { Token = result.Value.Token, Role = result.Value.Role, Id = result.Value.Id });
         }
     }
 
-    public class RegisterRequest
-    {
-        public string Name { get; set; }
-        public string Email { get; set; }
-        public string Password { get; set; }
-        public string UserType { get; set; }
-    }
-
-    public class LoginRequest
+    public class LoginModel
     {
         public string Email { get; set; }
         public string Password { get; set; }

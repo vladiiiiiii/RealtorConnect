@@ -1,41 +1,54 @@
-﻿using RealtorConnect.Models;
+﻿using Microsoft.EntityFrameworkCore;
+using RealtorConnect.Data;
+using RealtorConnect.Models;
 using RealtorConnect.Repositories.Interfaces;
+using RealtorConnect.Services.Interfaces;
 
 namespace RealtorConnect.Services
 {
-    public class ChatService
+    public class ChatService : IChatService
     {
-        private readonly IChatRepository _repository;
+        private readonly IChatRepository _chatRepository;
+        private readonly ApplicationDbContext _context;
 
-        public ChatService(IChatRepository repository)
+        public ChatService(IChatRepository chatRepository, ApplicationDbContext context)
         {
-            _repository = repository;
+            _chatRepository = chatRepository;
+            _context = context;
         }
 
-        public async Task<IEnumerable<ChatMessage>> GetChatMessagesAsync()
+        public async Task<List<ChatMessage>> GetChatMessagesAsync(int senderId, string senderType, int receiverId, string receiverType)
         {
-            return await _repository.GetAllAsync();
+            return await _chatRepository.GetChatMessagesAsync(senderId, senderType, receiverId, receiverType);
         }
 
-        public async Task<ChatMessage> GetChatMessageByIdAsync(int id)
+        public async Task SendMessageAsync(ChatMessage message, int clientId)
         {
-            return await _repository.GetByIdAsync(id);
-        }
+            // Проверяем, что отправитель — клиент и его ID совпадает с ID авторизованного пользователя
+            if (message.SenderType != "Client" || message.SenderId != clientId)
+                throw new UnauthorizedAccessException("You can only send messages from your own account as a client");
 
-        public async Task AddChatMessageAsync(ChatMessage chatMessage)
-        {
-            chatMessage.SentAt = DateTime.UtcNow;
-            await _repository.AddAsync(chatMessage);
-        }
+            // Проверяем, что получатель — риэлтор
+            if (message.ReceiverType != "Realtor")
+                throw new ArgumentException("Messages can only be sent to realtors");
 
-        public async Task UpdateChatMessageAsync(ChatMessage chatMessage)
-        {
-            await _repository.UpdateAsync(chatMessage);
-        }
+            // Проверяем, существует ли риэлтор
+            var realtor = await _context.Realtors.FindAsync(message.ReceiverId);
+            if (realtor == null)
+                throw new KeyNotFoundException("Realtor not found");
 
-        public async Task DeleteChatMessageAsync(int id)
-        {
-            await _repository.DeleteAsync(id);
+            // Проверяем, существует ли клиент (дополнительная проверка)
+            var client = await _context.Clients.FindAsync(message.SenderId);
+            if (client == null)
+                throw new KeyNotFoundException("Client not found");
+
+        
+
+            // Устанавливаем время отправки
+            message.SentAt = DateTime.UtcNow;
+
+            // Сохраняем сообщение
+            await _chatRepository.AddMessageAsync(message);
         }
     }
 }

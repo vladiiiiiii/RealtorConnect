@@ -1,12 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Threading.Tasks;
-using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
 using RealtorConnect.Data;
 using RealtorConnect.Models;
+using RealtorConnect.Services.Interfaces;
+using System.Security.Claims;
 
 namespace RealtorConnect.Controllers
 {
@@ -14,95 +12,100 @@ namespace RealtorConnect.Controllers
     [ApiController]
     public class ApartmentsController : ControllerBase
     {
+        private readonly IApartmentService _apartmentService; // Убедимся, что поле определено только один раз
         private readonly ApplicationDbContext _context;
 
-        public ApartmentsController(ApplicationDbContext context)
+        public ApartmentsController(IApartmentService apartmentService, ApplicationDbContext context)
         {
+            _apartmentService = apartmentService;
             _context = context;
         }
 
-        // GET: api/Apartments
         [HttpGet]
         public async Task<ActionResult<IEnumerable<Apartment>>> GetApartments()
         {
-            return await _context.Apartments.ToListAsync();
+            return await _apartmentService.GetAllApartmentsAsync();
         }
 
-        // GET: api/Apartments/5
         [HttpGet("{id}")]
         public async Task<ActionResult<Apartment>> GetApartment(int id)
         {
-            var apartment = await _context.Apartments.FindAsync(id);
-
-            if (apartment == null)
-            {
-                return NotFound();
-            }
-
+            var apartment = await _apartmentService.GetApartmentByIdAsync(id);
+            if (apartment == null) return NotFound();
             return apartment;
         }
 
-        // PUT: api/Apartments/5
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
-        [HttpPut("{id}")]
-        public async Task<IActionResult> PutApartment(int id, Apartment apartment)
+        [HttpGet("group/{groupId}")]
+        [Authorize(Roles = "Realtor")]
+        public async Task<IActionResult> GetApartmentsForGroup(int groupId)
         {
-            if (id != apartment.Id)
-            {
-                return BadRequest();
-            }
+            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var realtor = await _context.Realtors.FindAsync(realtorId);
+            if (realtor.GroupId != groupId) return Forbid();
 
-            _context.Entry(apartment).State = EntityState.Modified;
-
-            try
-            {
-                await _context.SaveChangesAsync();
-            }
-            catch (DbUpdateConcurrencyException)
-            {
-                if (!ApartmentExists(id))
-                {
-                    return NotFound();
-                }
-                else
-                {
-                    throw;
-                }
-            }
-
-            return NoContent();
+            var apartments = await _context.Apartments
+                .Where(a => _context.Realtors.Any(r => r.GroupId == groupId && r.Id == a.RealtorId))
+                .ToListAsync();
+            return Ok(apartments);
         }
 
-        // POST: api/Apartments
-        // To protect from overposting attacks, see https://go.microsoft.com/fwlink/?linkid=2123754
         [HttpPost]
+        [Authorize(Roles = "Realtor, Client")]
         public async Task<ActionResult<Apartment>> PostApartment(Apartment apartment)
         {
-            _context.Apartments.Add(apartment);
-            await _context.SaveChangesAsync();
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
 
-            return CreatedAtAction("GetApartment", new { id = apartment.Id }, apartment);
-        }
-
-        // DELETE: api/Apartments/5
-        [HttpDelete("{id}")]
-        public async Task<IActionResult> DeleteApartment(int id)
-        {
-            var apartment = await _context.Apartments.FindAsync(id);
-            if (apartment == null)
+            if (userRole == "Client")
             {
-                return NotFound();
+                apartment.ClientId = userId; // Клиент автоматически становится владельцем
+                apartment.RealtorId = null; // Клиент не может указывать риэлтора
             }
 
-            _context.Apartments.Remove(apartment);
-            await _context.SaveChangesAsync();
+            await _apartmentService.AddApartmentAsync(apartment, userId, userRole);
+            return CreatedAtAction(nameof(GetApartment), new { id = apartment.Id }, apartment);
+        }
 
+        [HttpPut("{id}")]
+        [Authorize(Roles = "Realtor, Client")]
+        public async Task<IActionResult> PutApartment(int id, Apartment apartment)
+        {
+            if (id != apartment.Id) return BadRequest();
+
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            await _apartmentService.UpdateApartmentAsync(apartment, userId, userRole);
             return NoContent();
         }
 
-        private bool ApartmentExists(int id)
+        [HttpDelete("{id}")]
+        [Authorize(Roles = "Realtor, Client")]
+        public async Task<IActionResult> DeleteApartment(int id)
         {
-            return _context.Apartments.Any(e => e.Id == id);
+            var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+            var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+            await _apartmentService.DeleteApartmentAsync(id, userId, userRole);
+            return NoContent();
+        }
+
+        [HttpPost("{id}/upload-photo")]
+        [Authorize(Roles = "Realtor, Client")]
+        public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
+        {
+            try
+            {
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+                var photoUrl = await _apartmentService.UploadPhotoAsync(id, file, userId, userRole);
+                return Ok(new { PhotoUrl = photoUrl });
+            }
+            catch (Exception ex)
+            {
+                return BadRequest(ex.Message);
+            }
         }
     }
 }

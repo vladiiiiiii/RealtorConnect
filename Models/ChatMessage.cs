@@ -6,21 +6,15 @@ namespace RealtorConnect.Models
     {
         [Key]
         public int Id { get; set; }
+        public int SenderId { get; set; }
 
-        public int? SenderClientId { get; set; }
-        public int? SenderRealtorId { get; set; }
+        [RegularExpression("^(Client|Realtor)$", ErrorMessage = "SenderType must be either 'Client' or 'Realtor'")]
+        public string SenderType { get; set; } // "Realtor" или "Client"
+        public int ReceiverId { get; set; }
 
-        public int? ReceiverClientId { get; set; }
-        public int? ReceiverRealtorId { get; set; }
-
-        [Required]
-        public string MessageContent { get; set; }
-
+        [RegularExpression("^(Client|Realtor)$", ErrorMessage = "ReceiverType must be either 'Client' or 'Realtor'")]
+        public string ReceiverType { get; set; } // "Realtor" или "Client"
+        public string Content { get; set; }
         public DateTime SentAt { get; set; } = DateTime.UtcNow;
-
-        public virtual Client SenderClient { get; set; }
-        public virtual Realtor SenderRealtor { get; set; }
-        public virtual Client ReceiverClient { get; set; }
-        public virtual Realtor ReceiverRealtor { get; set; }
     }
 }

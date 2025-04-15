@@ -3,7 +3,7 @@ using RealtorConnect.Data;
 using RealtorConnect.Models;
 using RealtorConnect.Repositories.Interfaces;
 
-namespace RealtorConnect.Repositories.Implementations
+namespace RealtorConnect.Repositories
 {
     public class ChatRepository : IChatRepository
     {
@@ -14,42 +14,19 @@ namespace RealtorConnect.Repositories.Implementations
             _context = context;
         }
 
-        public async Task<ChatMessage> GetByIdAsync(int id)
+        public async Task<List<ChatMessage>> GetChatMessagesAsync(int senderId, string senderType, int receiverId, string receiverType)
         {
             return await _context.ChatMessages
-                .Include(cm => cm.SenderClient)
-                .Include(cm => cm.SenderRealtor)
-                .FirstOrDefaultAsync(cm => cm.Id == id);
-        }
-
-        public async Task<IEnumerable<ChatMessage>> GetAllAsync()
-        {
-            return await _context.ChatMessages
-                .Include(cm => cm.ReceiverClient)
-                .Include(cm => cm.ReceiverRealtor)
+                .Where(m => (m.SenderId == senderId && m.SenderType == senderType && m.ReceiverId == receiverId && m.ReceiverType == receiverType) ||
+                            (m.SenderId == receiverId && m.SenderType == receiverType && m.ReceiverId == senderId && m.ReceiverType == senderType))
+                .OrderBy(m => m.SentAt)
                 .ToListAsync();
         }
 
-        public async Task AddAsync(ChatMessage entity)
+        public async Task AddMessageAsync(ChatMessage message)
         {
-            _context.ChatMessages.Add(entity);
+            _context.ChatMessages.Add(message);
             await _context.SaveChangesAsync();
-        }
-
-        public async Task UpdateAsync(ChatMessage entity)
-        {
-            _context.ChatMessages.Update(entity);
-            await _context.SaveChangesAsync();
-        }
-
-        public async Task DeleteAsync(int id)
-        {
-            var entity = await GetByIdAsync(id);
-            if (entity != null)
-            {
-                _context.ChatMessages.Remove(entity);
-                await _context.SaveChangesAsync();
-            }
         }
     }
 }

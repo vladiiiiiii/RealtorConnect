@@ -1,10 +1,14 @@
-﻿using BCrypt.Net;
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using Microsoft.AspNetCore.SignalR;
 using Microsoft.EntityFrameworkCore;
-using RealtorConnect.Data;
+using RealtorConnect.Hubs;
 using RealtorConnect.Models;
+using RealtorConnect.Models.Dto;
+using RealtorConnect.Services;
+using RealtorConnect.Services.Interfaces;
 using System.Security.Claims;
+
 
 namespace RealtorConnect.Controllers
 {
@@ -12,220 +16,188 @@ namespace RealtorConnect.Controllers
     [ApiController]
     public class RealtorsController : ControllerBase
     {
-        private readonly ApplicationDbContext _context;
+        private readonly IRealtorService _realtorService;
+        private readonly IChatService _chatService;
+        private readonly IHubContext<ChatHub> _hubContext;
+        private readonly ILogger<RealtorsController> _logger;
 
-        public RealtorsController(ApplicationDbContext context)
+        public RealtorsController(IRealtorService realtorService, IChatService chatService, ILogger<RealtorsController> logger, IHubContext<ChatHub> hubContext)
         {
-            _context = context;
+            _realtorService = realtorService;
+            _chatService = chatService;
+            _logger = logger;
+            _hubContext = hubContext;
         }
 
-        [HttpGet("apartments")]
-        [Authorize(Roles = "Realtor")]
-        public async Task<ActionResult<IEnumerable<Apartment>>> GetRealtorApartments([FromQuery] ApartmentFilter filter)
+        [HttpGet]
+        public async Task<ActionResult<IEnumerable<Realtor>>> GetRealtors()
         {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            var groupId = await _context.GroupRealtors
-                .Where(gr => gr.RealtorId == realtorId)
-                .Select(gr => gr.GroupId)
-                .FirstOrDefaultAsync();
+            return await _realtorService.GetAllRealtorsAsync();
+        }
 
-            var query = _context.Apartments
-                .Include(a => a.ApartmentStatus)
-                .Where(a => a.RealtorId == realtorId || (a.Realtor != null && a.Realtor.GroupRealtor.GroupId == groupId));
-
-            if (filter.PriceMax.HasValue) query = query.Where(a => a.Price <= (decimal)filter.PriceMax.Value);
-            if (filter.Rooms.HasValue) query = query.Where(a => a.Rooms == filter.Rooms);
-            if (!string.IsNullOrEmpty(filter.Address)) query = query.Where(a => a.Address.Contains(filter.Address));
-            if (filter.FloorMin.HasValue) query = query.Where(a => a.Floor >= filter.FloorMin);
-            if (filter.SquareAreaMin.HasValue) query = query.Where(a => a.SquareArea >= (decimal)filter.SquareAreaMin.Value);
-            if (!string.IsNullOrEmpty(filter.Area)) query = query.Where(a => a.Area.Contains(filter.Area));
-
-            return await query.ToListAsync();
+        [HttpGet("{id}")]
+        public async Task<ActionResult<Realtor>> GetRealtor(int id)
+        {
+            var realtor = await _realtorService.GetRealtorByIdAsync(id);
+            if (realtor == null) return NotFound();
+            return realtor;
         }
 
         [HttpPost]
-        [Authorize(Roles = "Realtor")]
-        public async Task<ActionResult<Apartment>> AddApartment(Apartment apartment)
+        public async Task<ActionResult<Realtor>> PostRealtor(Realtor realtor)
         {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            if (string.IsNullOrEmpty(apartment.Address) || apartment.Price <= 0)
-                return BadRequest("Address and price are required.");
-
-            apartment.RealtorId = realtorId;
-            apartment.ClientId = null;
-            _context.Apartments.Add(apartment);
-            await _context.SaveChangesAsync();
-
-            return CreatedAtAction(nameof(GetApartment), new { id = apartment.Id }, apartment);
+            await _realtorService.AddRealtorAsync(realtor);
+            return CreatedAtAction(nameof(GetRealtor), new { id = realtor.Id }, realtor);
         }
 
         [HttpPut("{id}")]
         [Authorize(Roles = "Realtor")]
-        public async Task<IActionResult> UpdateApartment(int id, Apartment apartment)
+        public async Task<IActionResult> PutRealtor(int id, Realtor realtor)
         {
-            if (id != apartment.Id) return BadRequest();
+            try
+            {
+                if (id != realtor.Id)
+                    return BadRequest("Realtor ID mismatch");
 
-            var existing = await _context.Apartments.FindAsync(id);
-            if (existing == null || existing.RealtorId != int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value))
-                return Forbid();
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (userId != id)
+                {
+                    _logger.LogWarning("Realtor {UserId} attempted to update Realtor {RealtorId}", userId, id);
+                    return Forbid("You can only update your own profile");
+                }
 
-            _context.Entry(existing).CurrentValues.SetValues(apartment);
-            await _context.SaveChangesAsync();
-            return NoContent();
+                await _realtorService.UpdateRealtorAsync(realtor);
+                return NoContent();
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error updating Realtor {RealtorId} by Realtor {UserId}", id, User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                return StatusCode(500, ex.Message);
+            }
         }
 
         [HttpDelete("{id}")]
-        [Authorize(Roles = "Realtor")]
-        public async Task<IActionResult> DeleteApartment(int id)
+        [Authorize(Roles = "Admin")]
+        public async Task<IActionResult> DeleteRealtor(int id)
         {
-            var apartment = await _context.Apartments.FindAsync(id);
-            if (apartment == null || apartment.RealtorId != int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value))
-                return Forbid();
-
-            _context.Apartments.Remove(apartment);
-            await _context.SaveChangesAsync();
-            return NoContent();
-        }
-
-        [HttpGet("favorite-clients")]
-        [Authorize(Roles = "Realtor")]
-        public async Task<ActionResult<IEnumerable<Client>>> GetClientsWithFavorites()
-        {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            var groupId = await _context.GroupRealtors
-                .Where(gr => gr.RealtorId == realtorId)
-                .Select(gr => gr.GroupId)
-                .FirstOrDefaultAsync();
-
-            var apartmentIds = await _context.Apartments
-                .Where(a => a.RealtorId == realtorId || (a.Realtor != null && a.Realtor.GroupRealtor.GroupId == groupId))
-                .Select(a => a.Id)
-                .ToListAsync();
-
-            var clientIds = await _context.Favorites
-                .Where(f => apartmentIds.Contains(f.ApartmentId))
-                .Select(f => f.ClientId)
-                .Distinct()
-                .ToListAsync();
-
-            return await _context.Clients
-                .Where(c => clientIds.Contains(c.Id))
-                .ToListAsync();
-        }
-
-        [HttpPost("assign-client")]
-        [Authorize(Roles = "Realtor")]
-        public async Task<IActionResult> AssignClientToGroup([FromBody] AssignClientRequest request)
-        {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            var groupId = await _context.GroupRealtors
-                .Where(gr => gr.RealtorId == realtorId)
-                .Select(gr => gr.GroupId)
-                .FirstOrDefaultAsync();
-
-            if (groupId != request.GroupId)
-                return Forbid("You can only assign clients to your own group.");
-
-            var existingGroupClient = await _context.GroupClients
-                .FirstOrDefaultAsync(gc => gc.ClientId == request.ClientId);
-            if (existingGroupClient != null)
-                return BadRequest("Client is already assigned to a group.");
-
-            var groupClient = new GroupClient
+            try
             {
-                GroupId = groupId,
-                ClientId = request.ClientId
-            };
-            _context.GroupClients.Add(groupClient);
-            await _context.SaveChangesAsync();
-
-            var client = await _context.Clients.FindAsync(request.ClientId);
-            client.GroupClientId = groupClient.Id;
-            await _context.SaveChangesAsync();
-
-            return Ok();
-        }
-
-        [HttpPost("add-client")]
-        [Authorize(Roles = "Realtor")]
-        public async Task<IActionResult> AddClient([FromBody] RegisterRequest model)
-        {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            var groupId = await _context.GroupRealtors
-                .Where(gr => gr.RealtorId == realtorId)
-                .Select(gr => gr.GroupId)
-                .FirstOrDefaultAsync();
-
-            if (await _context.Clients.AnyAsync(c => c.Email == model.Email))
-            {
-                return BadRequest("Email already exists.");
+                await _realtorService.DeleteRealtorAsync(id);
+                return NoContent();
             }
-
-            var client = new Client
+            catch (Exception ex)
             {
-                Name = model.Name,
-                Email = model.Email,
-                PasswordHash = BCrypt.Net.BCrypt.HashPassword(model.Password),
-            };
-            _context.Clients.Add(client);
-            await _context.SaveChangesAsync();
-
-            var groupClient = new GroupClient
-            {
-                GroupId = groupId,
-                ClientId = client.Id
-            };
-            _context.GroupClients.Add(groupClient);
-            await _context.SaveChangesAsync();
-
-            client.GroupClientId = groupClient.Id;
-            await _context.SaveChangesAsync();
-
-            return Ok(new { Message = "Client added and assigned to your group successfully" });
+                _logger.LogError(ex, "Error deleting Realtor {RealtorId} by Admin", id);
+                return StatusCode(500, ex.Message);
+            }
         }
 
-        [HttpGet("group-clients")]
+        [HttpPost("{id}/upload-photo")]
         [Authorize(Roles = "Realtor")]
-        public async Task<ActionResult<IEnumerable<Client>>> GetGroupClients()
+        public async Task<IActionResult> UploadPhoto(int id, IFormFile file)
         {
-            var realtorId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
-            var groupId = await _context.GroupRealtors
-                .Where(gr => gr.RealtorId == realtorId)
-                .Select(gr => gr.GroupId)
-                .FirstOrDefaultAsync();
+            try
+            {
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (userId != id)
+                {
+                    _logger.LogWarning("Realtor {UserId} attempted to upload photo for Realtor {RealtorId}", userId, id);
+                    return Forbid("You can only upload photos for your own profile");
+                }
 
-            return await _context.GroupClients
-                .Where(gc => gc.GroupId == groupId)
-                .Include(gc => gc.Client)
-                .Select(gc => gc.Client)
-                .ToListAsync();
+                var photoUrl = await _realtorService.UploadPhotoAsync(id, file);
+                return Ok(new { PhotoUrl = photoUrl });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error uploading photo for Realtor {RealtorId} by Realtor {UserId}", id, User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                return BadRequest(ex.Message);
+            }
         }
 
-        [HttpGet("{id}")]
-        public async Task<ActionResult<Apartment>> GetApartment(int id)
+        [HttpGet("{realtorId}/chat/{clientId}")]
+        [Authorize(Roles = "Realtor,Client")]
+        public async Task<ActionResult<IEnumerable<ChatMessage>>> GetChatMessages(int realtorId, int clientId)
         {
-            var apartment = await _context.Apartments
-                .Include(a => a.Realtor)
-                .Include(a => a.ApartmentStatus)
-                .FirstOrDefaultAsync(a => a.Id == id);
-            if (apartment == null) return NotFound();
-            return apartment;
+            try
+            {
+                // Получаем ID и роль авторизованного пользователя
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                var userRole = User.FindFirst(ClaimTypes.Role)?.Value;
+
+                // Проверяем, что пользователь запрашивает свои сообщения
+                if (userRole == "Realtor" && userId != realtorId)
+                {
+                    _logger.LogWarning("Realtor {UserId} attempted to access messages of Realtor {RealtorId}", userId, realtorId);
+                    return Unauthorized("You can only view your own messages");
+                }
+                if (userRole == "Client" && userId != clientId)
+                {
+                    _logger.LogWarning("Client {UserId} attempted to access messages of Client {ClientId}", userId, clientId);
+                    return Unauthorized("You can only view your own messages");
+                }
+
+                // Получаем сообщения
+                var messages = await _chatService.GetChatMessagesAsync(clientId, "Client", realtorId, "Realtor");
+                _logger.LogInformation("{UserRole} {UserId} retrieved messages between Client {ClientId} and Realtor {RealtorId}", userRole, userId, clientId, realtorId);
+                return Ok(messages);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving messages between Client {ClientId} and Realtor {RealtorId}", clientId, realtorId);
+                return StatusCode(500, "An error occurred while retrieving messages");
+            }
         }
-    }
 
-    public class AssignClientRequest
-    {
-        public int ClientId { get; set; }
-        public int GroupId { get; set; }
-    }
+        [HttpPost("{realtorId}/chat/send/{clientId}")]
+        [Authorize(Roles = "Realtor")]
+        public async Task<IActionResult> SendMessage(int realtorId, int clientId, [FromBody] SendMessageRequest request)
+        {
+            try
+            {
+                var userId = int.Parse(User.FindFirst(ClaimTypes.NameIdentifier)?.Value);
+                if (realtorId != userId)
+                {
+                    _logger.LogWarning("Realtor {UserId} attempted to send message as Realtor {RequestedRealtorId}", userId, realtorId);
+                    return Unauthorized("You can only send messages from your own account");
+                }
 
-    public class ApartmentFilter
-    {
-        public double? PriceMax { get; set; }
-        public int? Rooms { get; set; }
-        public int? FloorMin { get; set; }
-        public double? SquareAreaMin { get; set; }
-        public string Address { get; set; }
-        public string Area { get; set; }
+                var message = new ChatMessage
+                {
+                    SenderId = realtorId,
+                    SenderType = "Realtor",
+                    ReceiverId = clientId,
+                    ReceiverType = "Client",
+                    Content = request.Content,
+                    SentAt = DateTime.UtcNow
+                };
+
+                await _chatService.SendMessageAsync(message, clientId);
+                await _hubContext.Clients.User(clientId.ToString()).SendAsync("ReceiveMessage", message);
+
+                _logger.LogInformation("Realtor {RealtorId} sent message to Client {ClientId}", realtorId, clientId);
+                return Ok(new { Message = "Message sent successfully" });
+            }
+            catch (UnauthorizedAccessException ex)
+            {
+                _logger.LogWarning("Unauthorized access: {Message}", ex.Message);
+                return Unauthorized(ex.Message);
+            }
+            catch (KeyNotFoundException ex)
+            {
+                _logger.LogWarning("Not found: {Message}", ex.Message);
+                return NotFound(ex.Message);
+            }
+            catch (ArgumentException ex)
+            {
+                _logger.LogWarning("Invalid argument: {Message}", ex.Message);
+                return BadRequest(ex.Message);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error sending message from Realtor {RealtorId} to Client {ClientId}", realtorId, clientId);
+                return StatusCode(500, "An error occurred while sending the message");
+            }
+        }
     }
 }

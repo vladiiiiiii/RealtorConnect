@@ -8,13 +8,12 @@ namespace RealtorConnect.Data
         public DbSet<Apartment> Apartments { get; set; }
         public DbSet<ApartmentStatus> ApartmentStatuses { get; set; }
         public DbSet<Client> Clients { get; set; }
+        public DbSet<Admin> Admins { get; set; }
         public DbSet<Realtor> Realtors { get; set; }
         public DbSet<RealtorGroup> RealtorGroups { get; set; }
-        public DbSet<GroupRealtor> GroupRealtors { get; set; }
-        public DbSet<GroupClient> GroupClients { get; set; }
+        public DbSet<JoinRequest> JoinRequests { get; set; } // Добавляем для запросов на вступление
         public DbSet<ChatMessage> ChatMessages { get; set; }
         public DbSet<Favorite> Favorites { get; set; }
-        public DbSet<ViewHistory> ViewHistories { get; set; }
 
         public ApplicationDbContext(DbContextOptions<ApplicationDbContext> options) : base(options)
         {
@@ -22,37 +21,6 @@ namespace RealtorConnect.Data
 
         protected override void OnModelCreating(ModelBuilder modelBuilder)
         {
-            // Настройка связи ChatMessage -> SenderClient
-            modelBuilder.Entity<ChatMessage>()
-                .HasOne(cm => cm.SenderClient)
-                .WithMany(c => c.SentMessages)
-                .HasForeignKey(cm => cm.SenderClientId)
-                .HasPrincipalKey(c => c.Id) // Явно указываем первичный ключ
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Настройка связи ChatMessage -> SenderRealtor
-            modelBuilder.Entity<ChatMessage>()
-                .HasOne(cm => cm.SenderRealtor)
-                .WithMany(r => r.SentMessages)
-                .HasForeignKey(cm => cm.SenderRealtorId)
-                .HasPrincipalKey(r => r.Id) // Явно указываем первичный ключ
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Настройка связи ChatMessage -> ReceiverClient
-            modelBuilder.Entity<ChatMessage>()
-                .HasOne(cm => cm.ReceiverClient)
-                .WithMany(c => c.ReceivedMessages)
-                .HasForeignKey(cm => cm.ReceiverClientId)
-                .IsRequired(false) // Разрешаем null
-                .OnDelete(DeleteBehavior.Restrict);
-
-            // Настройка связи ChatMessage -> ReceiverRealtor
-            modelBuilder.Entity<ChatMessage>()
-                .HasOne(cm => cm.ReceiverRealtor)
-                .WithMany(r => r.ReceivedMessages)
-                .IsRequired(false) // Разрешаем null
-                .HasForeignKey(cm => cm.ReceiverRealtorId)
-                .OnDelete(DeleteBehavior.Restrict);
             // Связь Apartment-Realtor
             modelBuilder.Entity<Apartment>()
                 .HasOne(a => a.Realtor)
@@ -67,41 +35,37 @@ namespace RealtorConnect.Data
                 .HasForeignKey(a => a.ClientId)
                 .OnDelete(DeleteBehavior.SetNull);
 
+            // Связь Realtor-RealtorGroup
+            modelBuilder.Entity<Realtor>()
+                .HasOne(r => r.Group)
+                .WithMany(g => g.Realtors)
+                .HasForeignKey(r => r.GroupId)
+                .OnDelete(DeleteBehavior.SetNull);
+
+            // Связь JoinRequest
+            modelBuilder.Entity<JoinRequest>()
+                .HasOne(jr => jr.Realtor)
+                .WithMany()
+                .HasForeignKey(jr => jr.RealtorId);
+
+            modelBuilder.Entity<JoinRequest>()
+                .HasOne(jr => jr.Group)
+                .WithMany()
+                .HasForeignKey(jr => jr.GroupId);
+
             // Связь Favorite (многие ко многим)
             modelBuilder.Entity<Favorite>()
                 .HasKey(f => new { f.ClientId, f.ApartmentId });
 
-            // Связь ViewHistory (многие ко многим)
-            modelBuilder.Entity<ViewHistory>()
-                .HasKey(vh => new { vh.ClientId, vh.ApartmentId });
+            modelBuilder.Entity<Favorite>()
+                .HasOne(f => f.Client)
+                .WithMany(c => c.Favorites)
+                .HasForeignKey(f => f.ClientId);
 
-            // Связь Client-GroupClient (один-к-одному)
-            modelBuilder.Entity<Client>()
-                .HasOne(c => c.GroupClient)
-                .WithOne(gc => gc.Client)
-                .HasForeignKey<Client>(c => c.GroupClientId)
-                .OnDelete(DeleteBehavior.SetNull);
-
-            // Связь GroupClient-RealtorGroup (многие-к-одному)
-            modelBuilder.Entity<GroupClient>()
-                .HasOne(gc => gc.RealtorGroup)
-                .WithMany(g => g.GroupClients)
-                .HasForeignKey(gc => gc.GroupId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Связь Realtor-GroupRealtor (один-к-одному)
-            modelBuilder.Entity<Realtor>()
-                .HasOne(r => r.GroupRealtor)
-                .WithOne(gr => gr.Realtor)
-                .HasForeignKey<Realtor>(r => r.GroupRealtorId)
-                .OnDelete(DeleteBehavior.Cascade);
-
-            // Связь GroupRealtor-RealtorGroup (многие-к-одному)
-            modelBuilder.Entity<GroupRealtor>()
-                .HasOne(gr => gr.RealtorGroup)
-                .WithMany(g => g.GroupRealtors)
-                .HasForeignKey(gr => gr.GroupId)
-                .OnDelete(DeleteBehavior.Cascade);
+            modelBuilder.Entity<Favorite>()
+                .HasOne(f => f.Apartment)
+                .WithMany(a => a.Favorites)
+                .HasForeignKey(f => f.ApartmentId);
 
             // Начальные данные
             modelBuilder.Entity<ApartmentStatus>().HasData(

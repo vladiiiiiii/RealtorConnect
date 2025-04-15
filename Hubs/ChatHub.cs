@@ -1,33 +1,35 @@
-﻿using Microsoft.AspNetCore.SignalR;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.SignalR;
+using System.Security.Claims;
 using System.Threading.Tasks;
 
 namespace RealtorConnect.Hubs
 {
+    [Authorize]
     public class ChatHub : Hub
     {
-        public async Task SendMessage(int senderId, string senderType, int receiverId, string receiverType, string messageContent)
+        public override async Task OnConnectedAsync()
         {
-            string groupName = GetChatGroupName(senderId, receiverId);
-            await Clients.Group(groupName).SendAsync("ReceiveMessage", senderId, senderType, receiverId, receiverType, messageContent);
+            // Получаем ID пользователя из JWT-токена
+            var userId = Context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                // Связываем соединение с ID пользователя
+                await Groups.AddToGroupAsync(Context.ConnectionId, userId);
+            }
+
+            await base.OnConnectedAsync();
         }
 
-        public async Task JoinChat(int userId, int otherUserId)
+        public override async Task OnDisconnectedAsync(Exception exception)
         {
-            string groupName = GetChatGroupName(userId, otherUserId);
-            await Groups.AddToGroupAsync(Context.ConnectionId, groupName);
-        }
+            var userId = Context.User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (!string.IsNullOrEmpty(userId))
+            {
+                await Groups.RemoveFromGroupAsync(Context.ConnectionId, userId);
+            }
 
-        public async Task LeaveChat(int userId, int otherUserId)
-        {
-            string groupName = GetChatGroupName(userId, otherUserId);
-            await Groups.RemoveFromGroupAsync(Context.ConnectionId, groupName);
-        }
-
-        private string GetChatGroupName(int userId1, int userId2)
-        {
-            int smallerId = Math.Min(userId1, userId2);
-            int largerId = Math.Max(userId1, userId2);
-            return $"Chat_{smallerId}_{largerId}";
+            await base.OnDisconnectedAsync(exception);
         }
     }
 }

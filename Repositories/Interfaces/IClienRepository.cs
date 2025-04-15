@@ -6,13 +6,15 @@ namespace RealtorConnect.Repositories.Interfaces
 {
     public interface IClientRepository
     {
-        Task<Client> GetClientByIdAsync(int id);
-        Task<Client> GetClientByEmailAsync(string email);
-        Task<IEnumerable<Client>> GetClientsByGroupIdAsync(int groupId);
-        Task<IEnumerable<Client>> GetAllAsync();
-        Task AddClientAsync(Client client);
-        Task UpdateClientAsync(Client client);
-        Task DeleteClientAsync(int id);
-        Task<IEnumerable<ChatMessage>> GetChatHistoryAsync(int userId, string userType, int otherUserId, string otherUserType);
+        Task<List<Client>> GetClientsByGroupIdAsync(int groupId);
+        Task<List<Client>> GetAllAsync();
+        Task<Client> GetByIdAsync(int id);
+        Task<List<Client>> GetClientsByRealtorIdAsync(int realtorId);
+        Task AddAsync(Client client);
+        Task UpdateAsync(Client client);
+        Task DeleteAsync(int id);
+        Task<List<Favorite>> GetFavoritesAsync(int clientId);
+        Task AddFavoriteAsync(Favorite favorite);
+        Task RemoveFavoriteAsync(int clientId, int apartmentId);
     }
 }

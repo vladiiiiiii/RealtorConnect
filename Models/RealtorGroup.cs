@@ -1,5 +1,4 @@
-﻿using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
+﻿using System.ComponentModel.DataAnnotations;
 
 namespace RealtorConnect.Models
 {
@@ -7,13 +6,8 @@ namespace RealtorConnect.Models
     {
         [Key]
         public int Id { get; set; }
+        public string Name { get; set; }
 
-        [Required]
-        public string Name { get; set; } = null!;
-
-        public virtual ICollection<GroupRealtor> GroupRealtors { get; set; }
-        public virtual ICollection<GroupClient> GroupClients { get; set; }
-        public virtual ICollection<Apartment> Apartments { get; set; }
-
+        public List<Realtor> Realtors { get; set; } = new List<Realtor>();
     }
 }

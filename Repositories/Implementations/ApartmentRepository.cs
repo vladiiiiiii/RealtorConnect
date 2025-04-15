@@ -3,7 +3,7 @@ using RealtorConnect.Data;
 using RealtorConnect.Models;
 using RealtorConnect.Repositories.Interfaces;
 
-namespace RealtorConnect.Repositories.Implementations
+namespace RealtorConnect.Repositories
 {
     public class ApartmentRepository : IApartmentRepository
     {
@@ -14,40 +14,44 @@ namespace RealtorConnect.Repositories.Implementations
             _context = context;
         }
 
-        public async Task<Apartment> GetByIdAsync(int id)
+        public async Task<List<Apartment>> GetAllAsync()
         {
             return await _context.Apartments
-                .Include(a => a.Status)
                 .Include(a => a.Realtor)
-                .FirstOrDefaultAsync(a => a.Id == id);
-        }
-
-        public async Task<IEnumerable<Apartment>> GetAllAsync()
-        {
-            return await _context.Apartments
+                .Include(a => a.Client)
                 .Include(a => a.Status)
-                .Include(a => a.Realtor)
+                .Include(a => a.Favorites)
                 .ToListAsync();
         }
 
-        public async Task AddAsync(Apartment entity)
+        public async Task<Apartment> GetByIdAsync(int id)
         {
-            _context.Apartments.Add(entity);
+            return await _context.Apartments
+                .Include(a => a.Realtor)
+                .Include(a => a.Client)
+                .Include(a => a.Status)
+                .Include(a => a.Favorites)
+                .FirstOrDefaultAsync(a => a.Id == id);
+        }
+
+        public async Task AddAsync(Apartment apartment)
+        {
+            _context.Apartments.Add(apartment);
             await _context.SaveChangesAsync();
         }
 
-        public async Task UpdateAsync(Apartment entity)
+        public async Task UpdateAsync(Apartment apartment)
         {
-            _context.Apartments.Update(entity);
+            _context.Apartments.Update(apartment);
             await _context.SaveChangesAsync();
         }
 
         public async Task DeleteAsync(int id)
         {
-            var entity = await GetByIdAsync(id);
-            if (entity != null)
+            var apartment = await _context.Apartments.FindAsync(id);
+            if (apartment != null)
             {
-                _context.Apartments.Remove(entity);
+                _context.Apartments.Remove(apartment);
                 await _context.SaveChangesAsync();
             }
         }

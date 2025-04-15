@@ -1,40 +1,71 @@
-﻿using RealtorConnect.Models;
+﻿using RealtorConnect.Data;
+using RealtorConnect.Models;
 using RealtorConnect.Repositories.Interfaces;
+using RealtorConnect.Services.Interfaces;
 
 namespace RealtorConnect.Services
 {
-    public class RealtorService
+    public class RealtorService : IRealtorService
     {
-        private readonly IRealtorRepository _repository;
+        private readonly IRealtorRepository _realtorRepository;
+        private readonly ApplicationDbContext _context;
 
-        public RealtorService(IRealtorRepository repository)
+        public RealtorService(IRealtorRepository realtorRepository, ApplicationDbContext context)
         {
-            _repository = repository;
+            _realtorRepository = realtorRepository;
+            _context = context;
         }
 
-        public async Task<IEnumerable<Realtor>> GetRealtorsAsync()
+        public async Task<List<Realtor>> GetAllRealtorsAsync()
         {
-            return await _repository.GetAllAsync();
+            return await _realtorRepository.GetAllAsync();
         }
 
         public async Task<Realtor> GetRealtorByIdAsync(int id)
         {
-            return await _repository.GetByIdAsync(id);
+            return await _realtorRepository.GetByIdAsync(id);
         }
 
         public async Task AddRealtorAsync(Realtor realtor)
         {
-            await _repository.AddAsync(realtor);
+            await _realtorRepository.AddAsync(realtor);
         }
 
         public async Task UpdateRealtorAsync(Realtor realtor)
         {
-            await _repository.UpdateAsync(realtor);
+            await _realtorRepository.UpdateAsync(realtor);
         }
 
         public async Task DeleteRealtorAsync(int id)
         {
-            await _repository.DeleteAsync(id);
+            await _realtorRepository.DeleteAsync(id);
+        }
+
+        public async Task<string> UploadPhotoAsync(int realtorId, IFormFile file)
+        {
+            var realtor = await _context.Realtors.FindAsync(realtorId);
+            if (realtor == null)
+                throw new Exception("Realtor not found");
+
+            if (file == null || file.Length == 0)
+                throw new Exception("No file uploaded");
+
+            var uploadsDir = Path.Combine(Directory.GetCurrentDirectory(), "wwwroot/uploads");
+            if (!Directory.Exists(uploadsDir))
+                Directory.CreateDirectory(uploadsDir);
+
+            var fileName = Guid.NewGuid().ToString() + Path.GetExtension(file.FileName);
+            var filePath = Path.Combine(uploadsDir, fileName);
+
+            using (var stream = new FileStream(filePath, FileMode.Create))
+            {
+                await file.CopyToAsync(stream);
+            }
+
+            realtor.PhotoUrl = $"/uploads/{fileName}";
+            await _context.SaveChangesAsync();
+
+            return realtor.PhotoUrl;
         }
     }
 }
